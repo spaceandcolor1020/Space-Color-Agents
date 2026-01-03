@@ -1,12 +1,10 @@
-
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
 import { 
   ShieldCheck, 
   Cpu, 
   Eye, 
-  Award, 
   ArrowRight,
   Fingerprint,
   Sparkles,
@@ -15,17 +13,22 @@ import {
   ChevronRight,
   Maximize2,
   X,
-  Target,
   Crosshair,
   Layers,
   Activity,
   Scan,
   Database,
-  Archive
+  Archive,
+  AlertCircle
 } from 'lucide-react';
+
 import { LensId, ProjectData } from './types';
 import { DEFAULT_PROJECT } from './constants';
 import { generateLenses } from './services/geminiService';
+
+// --- REMOTE ASSET CDN ---
+// Pointing directly to the GitHub Raw content to bypass local server resolution issues
+const CDN_BASE = "https://raw.githubusercontent.com/spaceandcolor1020/Space-Color-Agents/main/public/assets/";
 
 // --- STYLING CONSTANTS ---
 const LENS_COLORS: Record<LensId, string> = {
@@ -53,7 +56,7 @@ const PARAM_CONFIG = {
     { label: "VISUAL_FIDELITY", value: 100 },
     { label: "PROCESS_METRICS", value: 80 }
   ],
-  source: [] // No dynamic tuning for source
+  source: [] 
 };
 
 const LOGIC_STEPS = {
@@ -86,12 +89,48 @@ const LOGIC_STEPS = {
     "BYPASSING: All context-aware filters",
     "RETRIEVING: Full chronological record from disk...",
     "DECOMPRESSING: Legacy_Project_Archive",
-    "VERIFYING: Data integrity... [100%]",
+    "VERIFYING: DATA_INTEGRITY... [100%]",
     "STATUS: Displaying raw source telemetry."
   ]
 };
 
 // --- COMPONENTS ---
+
+const CaseStudyImage = ({ src, alt, className = "" }: { src: string; alt?: string; className?: string }) => {
+  const [hasError, setHasError] = useState(false);
+  
+  // Extract filename and resolve from CDN
+  const filename = src.split('/').pop() || '';
+  const fullUrl = src.startsWith('http') || src.startsWith('data:') ? src : `${CDN_BASE}${filename}`;
+
+  const placeholderUrl = `https://placehold.co/1200x800/1a1a1a/ef4444/FFF?text=ASSET_MISSING`;
+
+  return (
+    <div className={`relative ${className} overflow-hidden bg-stone-900`}>
+      <img 
+        src={hasError ? placeholderUrl : fullUrl} 
+        alt={alt} 
+        className="w-full h-full object-cover transition-all duration-700"
+        style={{ opacity: hasError ? 0.4 : 1 }}
+        onError={(e) => {
+          console.error("CDN Failed:", fullUrl);
+          setHasError(true);
+        }}
+      />
+      {hasError && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-red-950/40 backdrop-blur-md border border-red-500/30 p-8 text-center">
+          <span className="mono-font text-[11px] text-red-500 font-black tracking-[0.3em] mb-4 flex items-center gap-2">
+            <X size={14} /> ERR_LOAD_FAILURE
+          </span>
+          <p className="mt-8 mono-font text-[9px] text-stone-600 uppercase tracking-widest leading-loose break-all">
+            [ CDN_ACCESS_FAILED ]<br/>
+            VERIFY URL: {fullUrl}
+          </p>
+        </div>
+      )}
+    </div>
+  );
+};
 
 const TechTag = ({ label, activeLens }: { label: string; activeLens: LensId }) => {
   const color = LENS_COLORS[activeLens];
@@ -134,8 +173,24 @@ const StreamingMarkdown = ({ content, lens }: { content: string; lens: LensId })
         ),
         ul: ({ children }) => <ul className="space-y-2 mb-8 list-none p-0">{children}</ul>,
         strong: ({ children }) => <TechTag label={String(children)} activeLens={lens} />,
-        p: ({ children }) => <p className="mb-6 font-medium text-[#1a1a1a]">{children}</p>,
-        code: ({ children }) => <code className="bg-stone-50 px-1.5 py-0.5 rounded mono-font text-[13px] border border-stone-200 text-[#1a1a1a]">{children}</code>
+        p: ({ children }) => <p className="mb-6 font-medium text-[#1a1a1a] leading-relaxed">{children}</p>,
+        code: ({ children }) => <code className="bg-stone-50 px-1.5 py-0.5 rounded mono-font text-[13px] border border-stone-200 text-[#1a1a1a]">{children}</code>,
+        img: (props: any) => (
+          <div className="my-16 group w-full">
+            <div className="border border-stone-200 shadow-sm overflow-hidden bg-white p-2 transition-all duration-500 group-hover:border-stone-400 group-hover:shadow-md">
+              <CaseStudyImage 
+                src={typeof props.src === 'string' ? props.src : ''} 
+                alt={props.alt} 
+                className="w-full h-auto min-h-[400px] grayscale-[0.5] group-hover:grayscale-0 transition-all duration-700 ease-out" 
+              />
+            </div>
+            {props.alt && (
+              <p className="mt-4 px-2 mono-font text-[9px] uppercase tracking-[0.4em] text-stone-400 font-bold border-l border-stone-200">
+                REF_ASSET // {props.alt.toUpperCase().replace(/\s+/g, '_')}
+              </p>
+            )}
+          </div>
+        )
       }}
     >
       {displayedText}
@@ -164,7 +219,7 @@ const GenerationParams = ({ activeLens }: { activeLens: LensId | 'home' }) => {
         borderColor: isHome ? '#292524' : isSource ? '#555' : `${barColor}80`,
         boxShadow: isHome ? 'none' : isSource ? 'none' : `0 0 25px -5px ${barColor}20`
       }}
-      className={`flex flex-col gap-5 p-4 bg-stone-900/30 border rounded-[1px] transition-all duration-700 relative overflow-hidden ${isSource ? 'opacity-60' : ''}`}
+      className="flex flex-col gap-5 p-4 bg-stone-900/30 border rounded-[1px] transition-all duration-700 relative overflow-hidden"
     >
       <h4 className="mono-font text-[9px] uppercase tracking-[0.4em] text-stone-500 font-black mb-2 flex items-center gap-2">
         <Activity size={10} className={`${!isHome && !isSource ? 'animate-pulse' : ''}`} style={{ color: !isHome ? barColor : '#444' }} />
@@ -187,20 +242,8 @@ const GenerationParams = ({ activeLens }: { activeLens: LensId | 'home' }) => {
             </div>
           </div>
         ))}
-        {isHome && (
-          <div className="py-4 text-center mono-font text-[8px] text-stone-700 uppercase tracking-widest">
-            Awaiting_Lens_Selection...
-          </div>
-        )}
-        {isSource && (
-          <div className="py-6 flex flex-col items-center gap-4">
-             <div className="w-full h-1 bg-stone-800/50" />
-             <span className="mono-font text-[9px] text-amber-600 font-black uppercase tracking-[0.4em] text-center">
-                [ MANUAL_OVERRIDE_ACTIVE ]
-             </span>
-             <div className="w-full h-1 bg-stone-800/50" />
-          </div>
-        )}
+        {isHome && <div className="py-4 text-center mono-font text-[8px] text-stone-700 uppercase tracking-widest">Awaiting_Selection...</div>}
+        {isSource && <div className="py-6 flex flex-col items-center gap-4"><div className="w-full h-px bg-stone-800" /><span className="mono-font text-[9px] text-amber-600 font-black uppercase tracking-[0.4em] text-center">[ OVERRIDE_ACTIVE ]</span><div className="w-full h-px bg-stone-800" /></div>}
       </div>
     </motion.div>
   );
@@ -221,25 +264,16 @@ const ThinkingOverlay = ({ lens, onComplete }: { lens: LensId, onComplete: () =>
   }, [visibleSteps, steps.length, onComplete]);
 
   return (
-    <motion.div 
-      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-      className="fixed inset-0 z-[100] flex items-center justify-center p-8 bg-stone-950/40 backdrop-blur-md"
-    >
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[100] flex items-center justify-center p-8 bg-stone-950/40 backdrop-blur-md">
       <div className="bg-[#050505] border border-stone-800 p-10 shadow-2xl max-w-xl w-full relative overflow-hidden">
         <div className="absolute inset-0 pointer-events-none opacity-[0.03] bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] bg-[length:100%_2px,3px_100%]" />
         <div className="flex justify-between items-center mb-8 border-b border-stone-800 pb-4">
-          <div className="flex items-center gap-3">
-            <Terminal size={14} className="text-[#00ff41]" />
-            <span className="mono-font text-[10px] text-stone-400 uppercase tracking-[0.4em] font-bold">Reasoning_Engine // {lens.toUpperCase()}</span>
-          </div>
+          <div className="flex items-center gap-3"><Terminal size={14} className="text-[#00ff41]" /><span className="mono-font text-[10px] text-stone-400 uppercase tracking-[0.4em] font-bold">REASONING_ENGINE // {lens.toUpperCase()}</span></div>
           <div className="w-1.5 h-1.5 bg-[#00ff41] animate-pulse shadow-[0_0_8px_#00ff41]" />
         </div>
         <div className="mono-font text-[#00ff41] text-[11px] space-y-4 uppercase tracking-widest leading-relaxed">
           {steps.slice(0, visibleSteps).map((step, i) => (
-            <div key={i} className="flex gap-4 group">
-              <span className="text-stone-700 select-none">[{String(i+1).padStart(2, '0')}]</span>
-              <span className="flex-1">{step}{i === visibleSteps - 1 ? <span className="inline-block w-2.5 h-4 bg-[#00ff41] ml-2 align-middle animate-pulse">█</span> : <span className="ml-2 text-stone-800 opacity-50">✓</span>}</span>
-            </div>
+            <div key={i} className="flex gap-4"><span className="text-stone-700 select-none">[{String(i+1).padStart(2, '0')}]</span><span className="flex-1">{step}{i === visibleSteps - 1 ? <span className="inline-block w-2.5 h-4 bg-[#00ff41] ml-2 align-middle animate-pulse">█</span> : <span className="ml-2 text-stone-800 opacity-50">✓</span>}</span></div>
           ))}
         </div>
       </div>
@@ -253,36 +287,23 @@ const ViewerContext = ({ activeLens, onSelect }: { activeLens: LensId | 'home', 
     { id: 'engineer', icon: <Cpu size={14} />, label: 'Engineer' },
     { id: 'designer', icon: <Eye size={14} />, label: 'Designer' }
   ];
-  
-  const system = [
-    { id: 'source', icon: <Archive size={14} />, label: 'SOURCE_DATA' }
-  ];
+  const system = [{ id: 'source', icon: <Archive size={14} />, label: 'SOURCE_DATA' }];
 
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-1">
         <span className="mono-font text-[9px] uppercase tracking-[0.4em] text-stone-600 mb-2 px-2">SYSTEM_MODE</span>
         {system.map(item => (
-          <button 
-            key={item.id} 
-            onClick={() => onSelect(item.id as LensId)} 
-            className={`flex items-center gap-3 px-3 py-2 transition-all border ${activeLens === item.id ? 'bg-amber-600 border-amber-600 text-black shadow-[0_0_15px_rgba(245,158,11,0.3)]' : 'bg-transparent border-stone-800 text-stone-500 hover:border-amber-900/50 hover:text-amber-500'}`}
-          >
+          <button key={item.id} onClick={() => onSelect(item.id as LensId)} className={`flex items-center gap-3 px-3 py-2 transition-all border ${activeLens === item.id ? 'bg-amber-600 border-amber-600 text-black' : 'bg-transparent border-stone-800 text-stone-500 hover:border-amber-900/50 hover:text-amber-500'}`}>
             {item.icon}<span className="mono-font text-[10px] uppercase tracking-widest font-black">{item.label}</span>
           </button>
         ))}
       </div>
-      
       <div className="h-px w-full border-t border-dashed border-stone-800" />
-      
       <div className="flex flex-col gap-1">
         <span className="mono-font text-[9px] uppercase tracking-[0.4em] text-stone-500 mb-2 px-2">VIEWER_CONTEXT</span>
         {personas.map(item => (
-          <button 
-            key={item.id} 
-            onClick={() => onSelect(item.id as LensId)} 
-            className={`flex items-center gap-3 px-3 py-2 transition-all border ${activeLens === item.id ? 'bg-stone-100 border-stone-100 text-stone-900 shadow-lg' : 'bg-transparent border-stone-800 text-stone-500 hover:border-stone-600 hover:text-stone-300'}`}
-          >
+          <button key={item.id} onClick={() => onSelect(item.id as LensId)} className={`flex items-center gap-3 px-3 py-2 transition-all border ${activeLens === item.id ? 'bg-stone-100 border-stone-100 text-stone-900 shadow-lg' : 'bg-transparent border-stone-800 text-stone-500 hover:border-stone-600 hover:text-stone-300'}`}>
             {item.icon}<span className="mono-font text-[10px] uppercase tracking-widest font-bold">{item.label}</span>
           </button>
         ))}
@@ -290,8 +311,6 @@ const ViewerContext = ({ activeLens, onSelect }: { activeLens: LensId | 'home', 
     </div>
   );
 };
-
-// --- APP ---
 
 export default function App() {
   const [project, setProject] = useState<ProjectData>(DEFAULT_PROJECT);
@@ -334,8 +353,8 @@ export default function App() {
 
   return (
     <LayoutGroup>
-      <div className="min-h-screen bg-[#050505] text-stone-200 sans-font selection:bg-stone-900 selection:text-white flex flex-col overflow-x-hidden">
-        <style>{` ::selection { background-color: ${currentAccent}; color: white; } .grid-bg { background-image: radial-gradient(circle, #1c1c1c 1px, transparent 1px); background-size: 30px 30px; } `}</style>
+      <div className="min-h-screen bg-[#050505] text-stone-200 sans-font flex flex-col overflow-x-hidden">
+        <style>{` ::selection { background-color: ${currentAccent}; color: white; } `}</style>
 
         <AnimatePresence>{targetLens && <ThinkingOverlay lens={targetLens} onComplete={() => { setActiveLens(targetLens); setTargetLens(null); }} />}</AnimatePresence>
 
@@ -344,7 +363,7 @@ export default function App() {
             <div className="w-10 h-10 bg-white flex items-center justify-center"><span className="text-black text-[10px] tracking-widest font-black mono-font">INDEX</span></div>
             <div className="hidden md:block">
               <h1 className="serif-font text-xl text-white tracking-tight leading-none mb-1">Ashley Golen Johnston</h1>
-              <span className="mono-font text-[8px] uppercase tracking-[0.4em] text-stone-500">Context Engine v4.9.2</span>
+              <span className="mono-font text-[8px] uppercase tracking-[0.4em] text-stone-500">Context Engine v4.9.5</span>
             </div>
           </div>
           <div className="flex items-center gap-10">
@@ -370,10 +389,6 @@ export default function App() {
                   </div>
                   <ViewerContext activeLens={activeLens} onSelect={handleLensSelect} />
                   <GenerationParams activeLens={activeLens} />
-                  <div className="space-y-1">
-                    <span className="mono-font text-[9px] uppercase tracking-[0.4em] text-stone-500 px-2 block mb-2">Merit_Archive</span>
-                    {project.meta.awards.map(a => <div key={a} className="bg-stone-900/40 text-[10px] mono-font p-2 text-stone-500 border border-stone-800 uppercase tracking-widest">{a}</div>)}
-                  </div>
                 </motion.div>
               ) : (
                 <motion.div key="home-sidebar" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="pt-20">
@@ -391,11 +406,23 @@ export default function App() {
                 <motion.div key="home-view" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex flex-col items-center justify-center pt-40 lg:pt-60 text-center px-12 h-full">
                   <h2 className="serif-font text-[10vw] text-white leading-none tracking-tighter italic mb-12">Glass<br/>Box.</h2>
                   <div className="max-w-xl mono-font text-xs uppercase tracking-[0.4em] text-stone-500 leading-relaxed mb-16">Architecting trust through verifiable system evidence. A multi-lens dossier experience.</div>
-                  <button onClick={() => handleLensSelect('recruiter')} className="bg-white text-black px-12 py-4 mono-font text-xs font-black uppercase tracking-[0.4em] hover:bg-stone-200">Launch_Engine</button>
+                  <button onClick={() => handleLensSelect('recruiter')} className="bg-white text-black px-12 py-4 mono-font text-xs font-black uppercase tracking-[0.4em] hover:bg-stone-200 transition-colors">Launch_Engine</button>
                 </motion.div>
               ) : (
-                <motion.div key={activeLens} initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -30 }} transition={{ duration: 0.8 }} className="bg-white min-h-screen p-8 md:p-24 shadow-[-20px_0_40px_rgba(0,0,0,0.5)]">
-                  <div className="max-w-5xl mx-auto text-[#1a1a1a]">
+                <motion.div key={activeLens} initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -30 }} transition={{ duration: 0.8 }} className="bg-white min-h-screen shadow-[-20px_0_40px_rgba(0,0,0,0.5)] flex flex-col">
+                  
+                  {/* HERO IMAGE - Resolved via CDN */}
+                  <div className="w-full aspect-[21/9] overflow-hidden relative group border-b border-stone-100 bg-stone-100">
+                    <CaseStudyImage 
+                      src="hero.jpg" 
+                      alt="Project Hero" 
+                      className="w-full h-full object-cover grayscale-[0.8] group-hover:grayscale-0 transition-all duration-[1200ms] ease-out scale-105 group-hover:scale-100" 
+                    />
+                    <div className="absolute inset-0 bg-stone-900/5 pointer-events-none group-hover:bg-transparent transition-all duration-700" />
+                    <div className="absolute top-8 left-8 bg-white/90 backdrop-blur px-3 py-1 mono-font text-[9px] text-stone-800 tracking-widest font-black border border-stone-200">PROJECT_ROOT // {project.meta.title.toUpperCase().replace(/\s+/g, '_')}</div>
+                  </div>
+
+                  <div className="max-w-5xl mx-auto text-[#1a1a1a] p-8 md:p-24 pt-12 md:pt-16 w-full">
                     <header className="grid grid-cols-1 lg:grid-cols-12 gap-12 mb-40">
                       <div className="lg:col-span-12 flex justify-between items-center mb-8">
                         <div className="flex items-center gap-4">
@@ -406,7 +433,7 @@ export default function App() {
                       <div className="lg:col-span-8"><h2 className="serif-font text-[6vw] leading-[0.95] text-[#1a1a1a] font-light tracking-tightest mb-0">{project.lenses[activeLens as LensId].headline}</h2></div>
                       <div className="lg:col-span-4 lg:mt-24">
                         <div className="p-8 bg-stone-50 border border-stone-100 relative">
-                          <span className="mono-font text-[9px] uppercase tracking-[0.4em] text-stone-400 mb-6 block font-black">Agency_Log.txt</span>
+                          <span className="mono-font text-[9px] uppercase tracking-[0.4em] text-stone-400 mb-6 block font-black">Perspective_Meta</span>
                           <p className="mono-font text-[11px] uppercase tracking-widest font-bold mb-4" style={{ color: currentAccent }}>{project.lenses[activeLens as LensId].status}</p>
                           <div className="flex justify-end pt-4 border-t border-stone-100"><Fingerprint className="w-6 h-6 opacity-10 text-stone-900" /></div>
                         </div>
@@ -435,9 +462,9 @@ export default function App() {
                         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
                           <div className="lg:col-span-4 flex flex-col justify-center">
                             <span className="mono-font text-[10px] text-stone-400 uppercase tracking-[0.4em] mb-4">Recommended Visualization</span>
-                            <p className="serif-font text-2xl text-[#1a1a1a] leading-snug mb-8">{project.lenses[activeLens as LensId].artifact}</p>
+                            <p className="serif-font text-2xl text-[#1a1a1a] font-medium leading-snug mb-8">{project.lenses[activeLens as LensId].artifact}</p>
                             <button onClick={() => setExpandedArtifact(true)} className="flex items-center gap-4 mono-font text-[10px] uppercase font-bold tracking-widest text-stone-400 hover:text-black transition-colors">
-                              <div className="w-10 h-px bg-stone-200 group-hover:bg-black" /> Expand_Data
+                              <div className="w-10 h-px bg-stone-200" /> Expand_Data
                             </button>
                           </div>
                           <div className="lg:col-span-8">
@@ -458,7 +485,7 @@ export default function App() {
         </main>
 
         <AnimatePresence>
-          {expandedArtifact && activeLens !== 'home' && project.lenses[activeLens as LensId].artifact && (
+          {expandedArtifact && activeLens !== 'home' && (
             <div className="fixed inset-0 z-[300] flex items-center justify-center p-8">
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setExpandedArtifact(false)} className="absolute inset-0 bg-[#050505]/95 backdrop-blur-2xl" />
               <motion.div layoutId="artifact-card" className="relative w-full max-w-6xl bg-[#050505] border border-stone-800 p-12 shadow-2xl overflow-hidden flex flex-col gap-12">
@@ -472,7 +499,6 @@ export default function App() {
                 </div>
                 <div className="flex-1 aspect-video bg-stone-900 border border-stone-800 relative group overflow-hidden flex items-center justify-center">
                   <div className="absolute inset-0 opacity-10 bg-[url('https://placehold.co/1200x800/1a1a1a/FFF?text=SYSTEM_BLUEPRINT_V4')] bg-cover bg-center grayscale mix-blend-overlay" />
-                  <div className="absolute inset-0 pointer-events-none opacity-5 bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] bg-[length:100%_4px,4px_100%]" />
                   <div className="flex flex-col items-center gap-6 relative z-10">
                     <div className="w-24 h-24 rounded-full border border-stone-800 flex items-center justify-center animate-spin-slow"><Crosshair className="text-stone-700" size={40} strokeWidth={0.5} /></div>
                     <p className="mono-font text-[10px] text-stone-600 uppercase tracking-[0.5em] animate-pulse">Scanning_Active_Telemetry_Node...</p>
