@@ -1,5 +1,5 @@
 
-export type LensId = 'recruiter' | 'engineer' | 'designer';
+export type LensId = 'recruiter' | 'engineer' | 'designer' | 'source';
 
 export interface Lens {
   headline: string;

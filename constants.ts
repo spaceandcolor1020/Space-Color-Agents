@@ -41,6 +41,12 @@ JSON SCHEMA:
       "reasoning": "First-person rationale for empathy/narrative optimization.",
       "status": "OPTIMIZING FOR: NARRATIVE & EMPATHY",
       "artifact": "Suggested journey map/UI artifact description"
+    },
+    "source": {
+      "headline": "String",
+      "content": "Markdown (Full raw record, high detail, chronological.)",
+      "reasoning": "Retrieving full archival record. No context filters applied.",
+      "status": "MODE: ARCHIVE_READ_ONLY"
     }
   }
 }
@@ -74,6 +80,12 @@ export const DEFAULT_PROJECT: ProjectData = {
       "reasoning": "I surfaced the emotive 'Human Router' metaphor and used blockquotes to highlight user insights, focusing on the empathy-driven design process.",
       "status": "OPTIMIZING FOR: NARRATIVE & EMPATHY",
       "artifact": "User Journey Map: Comparative visualization of the 'Old' fragmented flow vs. 'New' AI-assisted reasoning."
+    },
+    "source": {
+      "headline": "The Original Investigation (Raw Record)",
+      "content": "### Archival Summary\nThis document represents the unmodified, chronological project log for Gemini Cloud Assist Investigations. \n\n### Initial Hypothesis (Q1 2022)\nThe project was conceptualized to address the growing complexity of hybrid-cloud observability. Early user research indicated that SREs were overwhelmed by a 400% increase in telemetry volume over a 24-month period. The goal was to build a reasoning engine that could correlate cross-stack signals automatically.\n\n### Prototype Development\nInitial prototypes focused on graph-based topology views. We utilized D3.js for visual rendering and explored early integration with Google's internal LLM infrastructure for natural language log summarization. Key technical hurdles included low-latency data ingestion and provenance mapping for expert verification.\n\n### Deployment & Evolution\nThe system was first tested internally with Google's SRE teams. Success metrics included a 35% reduction in MTTR (Mean Time to Resolution) for known failure patterns. Post-deployment, the focus shifted to the 'Glass Box' philosophy to address the emergent 'AI trust gap'. \n\n### Technical Audit\nThe underlying architecture utilizes a combination of vector-based retrieval and structured telemetry anchoring. All AI outputs are subject to an 'Operator Validation' protocol before remediation scripts are finalized for execution.",
+      "reasoning": "Retrieving full archival record. No context filters applied. Displaying raw data for comprehensive audit.",
+      "status": "MODE: ARCHIVE_READ_ONLY"
     }
   }
 };
