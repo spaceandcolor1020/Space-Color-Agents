@@ -1,5 +1,5 @@
 
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, Type } from "@google/genai";
 import { SYSTEM_PROMPT } from "../constants";
 import { ProjectData } from "../types";
 
@@ -16,12 +16,78 @@ export const generateLenses = async (rawText: string): Promise<ProjectData> => {
       config: {
         systemInstruction: SYSTEM_PROMPT,
         responseMimeType: "application/json",
+        // The recommended way is to configure a responseSchema for the expected output.
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            meta: {
+              type: Type.OBJECT,
+              properties: {
+                title: { type: Type.STRING },
+                role: { type: Type.STRING },
+                timeline: { type: Type.STRING },
+                awards: { type: Type.ARRAY, items: { type: Type.STRING } },
+              },
+              required: ["title", "role", "timeline", "awards"]
+            },
+            lenses: {
+              type: Type.OBJECT,
+              properties: {
+                recruiter: {
+                  type: Type.OBJECT,
+                  properties: {
+                    headline: { type: Type.STRING },
+                    content: { type: Type.STRING },
+                    reasoning: { type: Type.STRING },
+                    status: { type: Type.STRING },
+                    artifact: { type: Type.STRING },
+                  },
+                  required: ["headline", "content", "reasoning", "status"]
+                },
+                engineer: {
+                  type: Type.OBJECT,
+                  properties: {
+                    headline: { type: Type.STRING },
+                    content: { type: Type.STRING },
+                    reasoning: { type: Type.STRING },
+                    status: { type: Type.STRING },
+                    artifact: { type: Type.STRING },
+                  },
+                  required: ["headline", "content", "reasoning", "status"]
+                },
+                designer: {
+                  type: Type.OBJECT,
+                  properties: {
+                    headline: { type: Type.STRING },
+                    content: { type: Type.STRING },
+                    reasoning: { type: Type.STRING },
+                    status: { type: Type.STRING },
+                    artifact: { type: Type.STRING },
+                  },
+                  required: ["headline", "content", "reasoning", "status"]
+                },
+                source: {
+                  type: Type.OBJECT,
+                  properties: {
+                    headline: { type: Type.STRING },
+                    content: { type: Type.STRING },
+                    reasoning: { type: Type.STRING },
+                    status: { type: Type.STRING }
+                  },
+                  required: ["headline", "content", "reasoning", "status"]
+                }
+              },
+              required: ["recruiter", "engineer", "designer", "source"]
+            }
+          },
+          required: ["meta", "lenses"]
+        },
         temperature: 0.7,
       },
     });
 
     // Extracting text output directly from the .text property
-    const jsonStr = response.text || '';
+    const jsonStr = response.text?.trim() || '';
     return JSON.parse(jsonStr) as ProjectData;
   } catch (error) {
     console.error("Gemini Generation Error:", error);

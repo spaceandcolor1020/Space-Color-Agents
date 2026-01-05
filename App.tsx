@@ -1,151 +1,292 @@
+
 import React, { useState, useMemo, useEffect } from 'react';
-import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
+import { motion, AnimatePresence, LayoutGroup, animate } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
 import { 
   ShieldCheck, 
   Cpu, 
   Eye, 
   ArrowRight,
-  Fingerprint,
   Sparkles,
   Loader2,
-  Terminal,
-  ChevronRight,
-  Maximize2,
   X,
-  Crosshair,
-  Layers,
-  Activity,
-  Scan,
-  Database,
   Archive,
-  AlertCircle
+  AlertCircle,
+  FileText,
+  Command
 } from 'lucide-react';
 
 import { LensId, ProjectData } from './types';
 import { DEFAULT_PROJECT } from './constants';
 import { generateLenses } from './services/geminiService';
 
-// --- REMOTE ASSET CDN ---
-// Pointing directly to the GitHub Raw content to bypass local server resolution issues
+// SOURCE OF TRUTH: Load assets directly from GitHub raw to bypass local server issues.
 const CDN_BASE = "https://raw.githubusercontent.com/spaceandcolor1020/Space-Color-Agents/main/public/assets/";
 
-// --- STYLING CONSTANTS ---
-const LENS_COLORS: Record<LensId, string> = {
-  engineer: "#70E24B",  // Neon Green
-  recruiter: "#1F32FF", // Vivid Blue
-  designer: "#FF08A7",  // Neon Pink
-  source: "#F59E0B"     // Amber (Archive/Warning)
+// --- ANIMATION VARIANTS ---
+const dossierTransition = { duration: 0.6, ease: [0.25, 1, 0.5, 1] };
+
+const staggerContainer = {
+  hidden: { opacity: 0 },
+  show: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1,
+      delayChildren: 0.3,
+    },
+  },
 };
 
-const ACCENT_COLOR_FALLBACK = "#002FA7";
-
-const PARAM_CONFIG = {
-  recruiter: [
-    { label: "ABSTRACTION_LEVEL", value: 90 },
-    { label: "BUSINESS_IMPACT", value: 100 },
-    { label: "TECHNICAL_DEPTH", value: 15 }
-  ],
-  engineer: [
-    { label: "ABSTRACTION_LEVEL", value: 10 },
-    { label: "SYSTEM_ARCHITECTURE", value: 95 },
-    { label: "BUSINESS_IMPACT", value: 40 }
-  ],
-  designer: [
-    { label: "ABSTRACTION_LEVEL", value: 50 },
-    { label: "VISUAL_FIDELITY", value: 100 },
-    { label: "PROCESS_METRICS", value: 80 }
-  ],
-  source: [] 
+const fadeUpItem = {
+  hidden: { opacity: 0, y: 30 },
+  show: { 
+    opacity: 1, 
+    y: 0, 
+    transition: { duration: 0.8, ease: [0.25, 1, 0.5, 1] } 
+  },
 };
 
-const LOGIC_STEPS = {
+// --- CONFIG & METRICS: CONTEXTUAL CHANNEL LOGIC ---
+const PARAM_CONFIG: Record<LensId | 'home', { label: string; value: number }[]> = {
+  home: [
+    { label: "SYSTEM_IDLE", value: 0 },
+    { label: "LATENCY_THRESHOLD", value: 0 },
+    { label: "TECHNICAL_DENSITY", value: 0 }
+  ],
   recruiter: [
-    "DETECTED_INTENT: Talent_Acquisition & Leadership_Scouting",
-    "FILTERING: Removing low-level implementation details...",
-    "PRIORITY_SHIFT: Amplifying '0-to-1 Strategy' & 'Business Impact'",
-    "CALCULATING: ROI_Metrics... [DONE]",
-    "FORMATTING: Executive_Summary (Brevity_Mode: ON)",
-    "STATUS: Ready for non-technical review."
+    { label: "STRATEGIC_SCOPE", value: 95 },
+    { label: "MARKET_IMPACT", value: 100 },
+    { label: "TECHNICAL_DENSITY", value: 15 }
   ],
   engineer: [
-    "DETECTED_INTENT: Technical_Feasibility & System_Architecture",
-    "FETCHING: 'Glass_Box_Trust_Model' logic flows...",
-    "EXPANDING: AIOps & Observability stack details...",
-    "ANALYSIS: Surfacing 'Agentic Readiness' standards",
-    "METRICS_OVERLAY: Latency (142ms) & Token_Optimization",
-    "STATUS: Decompressing technical specifications."
+    { label: "SYSTEM_ARCHITECTURE", value: 98 },
+    { label: "LOGIC_COMPLEXITY", value: 90 },
+    { label: "TECHNICAL_DENSITY", value: 95 }
   ],
   designer: [
-    "DETECTED_INTENT: UX_Methodology & Interaction_Patterns",
-    "LOADING_ASSETS: Figma_Comps, Process_Decks, User_Journeys...",
-    "HIGHLIGHTING: 'Insight Speed' vs 'Query Speed' rationale",
-    "TRACING: Evolution of the 'Context Engine' design system",
-    "CHECKING: Accessibility & Contrast_Ratios... [PASS]",
-    "STATUS: Rendering visual narrative."
+    { label: "USER_EMPATHY", value: 100 },
+    { label: "VISUAL_CRAFT", value: 85 },
+    { label: "TECHNICAL_DENSITY", value: 45 }
   ],
   source: [
-    "SYSTEM_OVERRIDE: Manual_Audit_Mode_Engaged",
-    "BYPASSING: All context-aware filters",
-    "RETRIEVING: Full chronological record from disk...",
-    "DECOMPRESSING: Legacy_Project_Archive",
-    "VERIFYING: DATA_INTEGRITY... [100%]",
-    "STATUS: Displaying raw source telemetry."
+    { label: "RAW_DATA_INTEGRITY", value: 100 },
+    { label: "CONTEXTUAL_BIAS", value: 0 },
+    { label: "FILTERING", value: 0 }
+  ]
+};
+
+// --- AGENTIC PUBLISHING LOGIC ---
+const LOGIC_STEPS = {
+  recruiter: [
+    "AUDIENCE_ANALYSIS: Talent & Leadership",
+    "CURATING: Strategic_Highlights & ROI...",
+    "CUTTING: Technical_Jargon...",
+    "TYPESETTING: Executive_Brief_Layout",
+    "STATUS: Ready for Print."
+  ],
+  engineer: [
+    "AUDIENCE_ANALYSIS: Systems_Architecture",
+    "SOURCING: Schematic_Diagrams & Logs...",
+    "EXPANDING: Technical_Appendix...",
+    "TYPESETTING: Documentation_Layout",
+    "STATUS: Specs Verified."
+  ],
+  designer: [
+    "AUDIENCE_ANALYSIS: Design_Systems",
+    "SOURCING: Process_Artifacts & Journeys...",
+    "WEAVING: Narrative_Thread...",
+    "TYPESETTING: Visual_Essay_Layout",
+    "STATUS: Rendering Assets."
+  ],
+  source: [
+    "AUDIENCE_ANALYSIS: Archival_Audit",
+    "RECOVERING: Unprocessed_Record...",
+    "BYPASSING: Editorial_Filters...",
+    "TYPESETTING: Raw_Transcripts",
+    "STATUS: Archive_Unlocked."
   ]
 };
 
 // --- COMPONENTS ---
 
-const CaseStudyImage = ({ src, alt, className = "" }: { src: string; alt?: string; className?: string }) => {
-  const [hasError, setHasError] = useState(false);
+const AnimatedNumber = ({ value }: { value: number }) => {
+  const [displayValue, setDisplayValue] = useState(value);
   
-  // Extract filename and resolve from CDN
-  const filename = src.split('/').pop() || '';
-  const fullUrl = src.startsWith('http') || src.startsWith('data:') ? src : `${CDN_BASE}${filename}`;
+  useEffect(() => {
+    const controls = animate(displayValue, value, {
+      duration: 1,
+      ease: [0.25, 1, 0.5, 1],
+      onUpdate: (latest) => setDisplayValue(Math.floor(latest))
+    });
+    return () => controls.stop();
+  }, [value]);
 
-  const placeholderUrl = `https://placehold.co/1200x800/1a1a1a/ef4444/FFF?text=ASSET_MISSING`;
+  return <span className="inline-block w-[4ch] text-right">[{displayValue}%]</span>;
+};
+
+interface MetricTrackProps {
+  label: string;
+  value: number;
+  isUpdating: boolean;
+  index: number;
+  key?: React.Key;
+}
+
+const MetricTrack = ({ label, value, isUpdating, index }: MetricTrackProps) => {
+  return (
+    <div className="space-y-3">
+      <div className="flex justify-between items-baseline h-4">
+        <motion.span 
+          layoutId={`metric-label-${index}`}
+          animate={{ 
+            color: isUpdating ? '#ffffff' : '#78716c',
+            opacity: isUpdating ? 1 : 0.8
+          }}
+          className="mono-font text-[9px] uppercase tracking-[0.2em] font-black transition-colors"
+        >
+          {label}
+        </motion.span>
+        <span className="mono-font text-[9px] text-stone-500 font-bold tracking-widest">
+          <AnimatedNumber value={value} />
+        </span>
+      </div>
+      <div className="h-[1px] bg-stone-900 w-full relative">
+        <motion.div 
+          initial={{ left: '0%' }}
+          animate={{ left: `${value}%` }}
+          transition={{ type: "spring", stiffness: 45, damping: 10 }}
+          className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-1 h-3 bg-stone-200"
+        />
+      </div>
+    </div>
+  );
+};
+
+const GenerationParams = ({ activeLens }: { activeLens: LensId | 'home' }) => {
+  const [isUpdating, setIsUpdating] = useState<boolean>(false);
+  const metrics = PARAM_CONFIG[activeLens];
+
+  useEffect(() => {
+    setIsUpdating(true);
+    const timer = setTimeout(() => setIsUpdating(false), 800);
+    return () => clearTimeout(timer);
+  }, [activeLens]);
 
   return (
-    <div className={`relative ${className} overflow-hidden bg-stone-900`}>
-      <img 
-        src={hasError ? placeholderUrl : fullUrl} 
-        alt={alt} 
-        className="w-full h-full object-cover transition-all duration-700"
-        style={{ opacity: hasError ? 0.4 : 1 }}
-        onError={(e) => {
-          console.error("CDN Failed:", fullUrl);
-          setHasError(true);
-        }}
-      />
-      {hasError && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-red-950/40 backdrop-blur-md border border-red-500/30 p-8 text-center">
-          <span className="mono-font text-[11px] text-red-500 font-black tracking-[0.3em] mb-4 flex items-center gap-2">
-            <X size={14} /> ERR_LOAD_FAILURE
-          </span>
-          <p className="mt-8 mono-font text-[9px] text-stone-600 uppercase tracking-widest leading-loose break-all">
-            [ CDN_ACCESS_FAILED ]<br/>
-            VERIFY URL: {fullUrl}
-          </p>
+    <div className="space-y-8 mt-12">
+      <LayoutGroup id="metrics-group">
+        {metrics.map((metric, i) => (
+          <MetricTrack 
+            key={`${activeLens}-${i}`}
+            index={i}
+            label={metric.label} 
+            value={metric.value} 
+            isUpdating={isUpdating} 
+          />
+        ))}
+      </LayoutGroup>
+    </div>
+  );
+};
+
+interface CuratingOverlayProps {
+  lens: LensId;
+  onComplete: () => void;
+}
+
+const CuratingOverlay = ({ lens, onComplete }: CuratingOverlayProps) => {
+  const steps = LOGIC_STEPS[lens];
+  const [visibleSteps, setVisibleSteps] = useState(0);
+
+  useEffect(() => {
+    if (visibleSteps < steps.length) {
+      const timer = setTimeout(() => setVisibleSteps(prev => prev + 1), 350);
+      return () => clearTimeout(timer);
+    } else {
+      const timer = setTimeout(onComplete, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [visibleSteps, steps.length, onComplete]);
+
+  return (
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[200] flex items-center justify-center p-8 bg-stone-950/60 backdrop-blur-xl">
+      <div className="max-w-md w-full text-center">
+        <motion.div animate={{ rotate: 360 }} transition={{ duration: 4, repeat: Infinity, ease: "linear" }} className="w-12 h-12 border-t-2 border-white rounded-full mx-auto mb-12 opacity-40" />
+        <div className="mono-font text-[10px] text-stone-500 uppercase tracking-[0.5em] mb-8">System_Curating // {lens.toUpperCase()}_EDIT</div>
+        <div className="space-y-4">
+          {steps.slice(0, visibleSteps).map((step, i) => (
+            <motion.div 
+              key={i} 
+              initial={{ opacity: 0, y: 5 }} 
+              animate={{ opacity: 1, y: 0 }} 
+              className="mono-font text-white text-[11px] uppercase tracking-widest flex items-center justify-center gap-3"
+            >
+              <span className="text-stone-700">[{String(i+1).padStart(2, '0')}]</span>
+              {step}
+              {i === visibleSteps - 1 && <motion.span animate={{ opacity: [0, 1, 0] }} transition={{ repeat: Infinity, duration: 0.8 }}>█</motion.span>}
+            </motion.div>
+          ))}
+        </div>
+      </div>
+    </motion.div>
+  );
+};
+
+// The robust CDN Image Loader styled for the editorial layout
+const CaseStudyImage = ({ src, alt }: { src: string | undefined; alt?: string }) => {
+  if (!src) return null;
+
+  // 1. Clean path: Ensure we just have the filename (e.g., "hero.jpg")
+  const filename = src.split('/').pop() || src;
+
+  // 2. Construct full CDN URL
+  const fullUrl = `${CDN_BASE}${filename}`;
+
+  // 3. Editorial Styling
+  return (
+    <div className="my-12 group">
+      {/* The Image Container */}
+      <div className="relative w-full overflow-hidden rounded-sm border border-stone-200 bg-stone-100 shadow-sm">
+         <img
+            src={fullUrl}
+            alt={alt}
+            className="w-full h-auto object-cover transition-transform duration-700 scale-100 group-hover:scale-[1.02] grayscale hover:grayscale-0"
+            onError={(e) => {
+                // Fallback for debugging if CDN fails
+                e.currentTarget.src = `https://placehold.co/800x450/e5e5e5/a3a3a3?text=CDN_ERR:+${filename}`;
+            }}
+         />
+      </div>
+      {/* Editorial Caption */}
+      {alt && (
+        <div className="mt-3 border-l border-stone-300 pl-3">
+            <p className="mono-font text-[10px] uppercase tracking-[0.15em] text-stone-500">
+                FIG. // {alt}
+            </p>
         </div>
       )}
     </div>
   );
 };
 
-const TechTag = ({ label, activeLens }: { label: string; activeLens: LensId }) => {
-  const color = LENS_COLORS[activeLens];
+const TechTag = ({ label }: { label: string }) => {
   return (
-    <motion.span
-      whileHover={{ backgroundColor: `${color}15`, boxShadow: `0 0 12px -1px ${color}60` }}
-      className="inline-flex items-center px-3 py-1.5 rounded-[4px] border mono-font text-[10px] uppercase tracking-wider font-bold transition-all cursor-default"
-      style={{ borderColor: color, color: color, boxShadow: `0 0 8px -1px ${color}40`, backgroundColor: `${color}05` }}
+    <motion.span 
+      whileHover={{ backgroundColor: '#1c1917', color: '#ffffff' }}
+      transition={{ duration: 0.2 }}
+      className="inline-flex items-center px-2 py-0.5 border border-stone-900 mono-font text-[10px] uppercase tracking-widest font-bold bg-white text-stone-900 mx-1 cursor-crosshair select-none"
     >
       {label}
     </motion.span>
   );
 };
 
-const StreamingMarkdown = ({ content, lens }: { content: string; lens: LensId }) => {
+interface StreamingMarkdownProps {
+  content: string;
+  lens: LensId;
+}
+
+const StreamingMarkdown = ({ content, lens }: StreamingMarkdownProps) => {
   const [displayedText, setDisplayedText] = useState("");
   
   useEffect(() => {
@@ -154,43 +295,28 @@ const StreamingMarkdown = ({ content, lens }: { content: string; lens: LensId })
     const interval = setInterval(() => {
       if (index <= content.length) {
         setDisplayedText(content.slice(0, index));
-        index += Math.floor(Math.random() * 12) + 6;
+        index += Math.floor(Math.random() * 20) + 15;
       } else {
         clearInterval(interval);
       }
-    }, 8);
+    }, 5);
     return () => clearInterval(interval);
   }, [content]);
 
   return (
     <ReactMarkdown
       components={{
+        h3: ({ children }) => <h3 className="serif-font text-3xl italic mb-6 text-stone-900">{children}</h3>,
+        p: ({ children }) => <p className="mb-8 sans-font text-lg leading-loose text-stone-800 font-normal">{children}</p>,
+        strong: ({ children }) => <TechTag label={String(children)} />,
+        ul: ({ children }) => <ul className="space-y-4 mb-10 pl-0">{children}</ul>,
         li: ({ children }) => (
-          <li className="flex gap-4 mb-4 text-[15px] group">
-            <ChevronRight className="w-4 h-4 mt-1 shrink-0" style={{ color: LENS_COLORS[lens] }} />
-            <span className="text-[#1a1a1a]">{children}</span>
+          <li className="flex gap-4 items-start group">
+            <span className="w-1.5 h-1.5 rounded-full bg-stone-900 mt-2.5 shrink-0" />
+            <span className="text-stone-800 leading-relaxed text-lg">{children}</span>
           </li>
         ),
-        ul: ({ children }) => <ul className="space-y-2 mb-8 list-none p-0">{children}</ul>,
-        strong: ({ children }) => <TechTag label={String(children)} activeLens={lens} />,
-        p: ({ children }) => <p className="mb-6 font-medium text-[#1a1a1a] leading-relaxed">{children}</p>,
-        code: ({ children }) => <code className="bg-stone-50 px-1.5 py-0.5 rounded mono-font text-[13px] border border-stone-200 text-[#1a1a1a]">{children}</code>,
-        img: (props: any) => (
-          <div className="my-16 group w-full">
-            <div className="border border-stone-200 shadow-sm overflow-hidden bg-white p-2 transition-all duration-500 group-hover:border-stone-400 group-hover:shadow-md">
-              <CaseStudyImage 
-                src={typeof props.src === 'string' ? props.src : ''} 
-                alt={props.alt} 
-                className="w-full h-auto min-h-[400px] grayscale-[0.5] group-hover:grayscale-0 transition-all duration-700 ease-out" 
-              />
-            </div>
-            {props.alt && (
-              <p className="mt-4 px-2 mono-font text-[9px] uppercase tracking-[0.4em] text-stone-400 font-bold border-l border-stone-200">
-                REF_ASSET // {props.alt.toUpperCase().replace(/\s+/g, '_')}
-              </p>
-            )}
-          </div>
-        )
+        img: ({src, alt}) => <CaseStudyImage src={src} alt={alt} />
       }}
     >
       {displayedText}
@@ -198,117 +324,49 @@ const StreamingMarkdown = ({ content, lens }: { content: string; lens: LensId })
   );
 };
 
-const GenerationParams = ({ activeLens }: { activeLens: LensId | 'home' }) => {
-  const isHome = activeLens === 'home';
-  const isSource = activeLens === 'source';
-  const currentParams = isHome || isSource ? [] : (PARAM_CONFIG[activeLens as LensId] || []);
-  const barColor = isHome ? "#333" : LENS_COLORS[activeLens as LensId];
-  const [jitter, setJitter] = useState(0);
+interface ViewerContextProps {
+  activeLens: LensId | 'home';
+  onSelect: (id: LensId | 'home') => void;
+}
 
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setJitter((Math.random() - 0.5) * 4);
-    }, 2000);
-    return () => clearInterval(interval);
-  }, []);
-
-  return (
-    <motion.div 
-      initial={false}
-      animate={{ 
-        borderColor: isHome ? '#292524' : isSource ? '#555' : `${barColor}80`,
-        boxShadow: isHome ? 'none' : isSource ? 'none' : `0 0 25px -5px ${barColor}20`
-      }}
-      className="flex flex-col gap-5 p-4 bg-stone-900/30 border rounded-[1px] transition-all duration-700 relative overflow-hidden"
-    >
-      <h4 className="mono-font text-[9px] uppercase tracking-[0.4em] text-stone-500 font-black mb-2 flex items-center gap-2">
-        <Activity size={10} className={`${!isHome && !isSource ? 'animate-pulse' : ''}`} style={{ color: !isHome ? barColor : '#444' }} />
-        [ ADAPTIVE_TUNING ]
-      </h4>
-      <div className="space-y-4">
-        {currentParams.map((param) => (
-          <div key={param.label} className="space-y-2">
-            <div className="flex justify-between items-center mono-font text-[10px] tracking-widest text-stone-400 font-medium">
-              <span>{param.label}</span>
-              <span className="text-stone-600">[{Math.round(param.value + jitter)}%]</span>
-            </div>
-            <div className="h-1 w-full bg-stone-800/50 rounded-full overflow-hidden">
-              <motion.div
-                initial={false}
-                animate={{ width: `${Math.min(100, Math.max(0, param.value + jitter))}%`, backgroundColor: barColor }}
-                transition={{ type: "spring", stiffness: 50, damping: 15 }}
-                className="h-full rounded-full opacity-80"
-              />
-            </div>
-          </div>
-        ))}
-        {isHome && <div className="py-4 text-center mono-font text-[8px] text-stone-700 uppercase tracking-widest">Awaiting_Selection...</div>}
-        {isSource && <div className="py-6 flex flex-col items-center gap-4"><div className="w-full h-px bg-stone-800" /><span className="mono-font text-[9px] text-amber-600 font-black uppercase tracking-[0.4em] text-center">[ OVERRIDE_ACTIVE ]</span><div className="w-full h-px bg-stone-800" /></div>}
-      </div>
-    </motion.div>
-  );
-};
-
-const ThinkingOverlay = ({ lens, onComplete }: { lens: LensId, onComplete: () => void }) => {
-  const steps = LOGIC_STEPS[lens];
-  const [visibleSteps, setVisibleSteps] = useState(0);
-
-  useEffect(() => {
-    if (visibleSteps < steps.length) {
-      const timer = setTimeout(() => setVisibleSteps(prev => prev + 1), 300);
-      return () => clearTimeout(timer);
-    } else {
-      const timer = setTimeout(onComplete, 400);
-      return () => clearTimeout(timer);
-    }
-  }, [visibleSteps, steps.length, onComplete]);
-
-  return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[100] flex items-center justify-center p-8 bg-stone-950/40 backdrop-blur-md">
-      <div className="bg-[#050505] border border-stone-800 p-10 shadow-2xl max-w-xl w-full relative overflow-hidden">
-        <div className="absolute inset-0 pointer-events-none opacity-[0.03] bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] bg-[length:100%_2px,3px_100%]" />
-        <div className="flex justify-between items-center mb-8 border-b border-stone-800 pb-4">
-          <div className="flex items-center gap-3"><Terminal size={14} className="text-[#00ff41]" /><span className="mono-font text-[10px] text-stone-400 uppercase tracking-[0.4em] font-bold">REASONING_ENGINE // {lens.toUpperCase()}</span></div>
-          <div className="w-1.5 h-1.5 bg-[#00ff41] animate-pulse shadow-[0_0_8px_#00ff41]" />
-        </div>
-        <div className="mono-font text-[#00ff41] text-[11px] space-y-4 uppercase tracking-widest leading-relaxed">
-          {steps.slice(0, visibleSteps).map((step, i) => (
-            <div key={i} className="flex gap-4"><span className="text-stone-700 select-none">[{String(i+1).padStart(2, '0')}]</span><span className="flex-1">{step}{i === visibleSteps - 1 ? <span className="inline-block w-2.5 h-4 bg-[#00ff41] ml-2 align-middle animate-pulse">█</span> : <span className="ml-2 text-stone-800 opacity-50">✓</span>}</span></div>
-          ))}
-        </div>
-      </div>
-    </motion.div>
-  );
-};
-
-const ViewerContext = ({ activeLens, onSelect }: { activeLens: LensId | 'home', onSelect: (id: LensId | 'home') => void }) => {
-  const personas = [
-    { id: 'recruiter', icon: <ShieldCheck size={14} />, label: 'Recruiter' },
-    { id: 'engineer', icon: <Cpu size={14} />, label: 'Engineer' },
-    { id: 'designer', icon: <Eye size={14} />, label: 'Designer' }
+const ViewerContext = ({ activeLens, onSelect }: ViewerContextProps) => {
+  const options = [
+    { id: 'recruiter', label: 'RECRUITER_EDIT', icon: <ShieldCheck size={12} /> },
+    { id: 'engineer', label: 'ENGINEER_EDIT', icon: <Cpu size={12} /> },
+    { id: 'designer', label: 'DESIGNER_EDIT', icon: <Eye size={12} /> },
+    { id: 'source', label: 'RAW_ARCHIVE', icon: <Archive size={12} /> }
   ];
-  const system = [{ id: 'source', icon: <Archive size={14} />, label: 'SOURCE_DATA' }];
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-1">
-        <span className="mono-font text-[9px] uppercase tracking-[0.4em] text-stone-600 mb-2 px-2">SYSTEM_MODE</span>
-        {system.map(item => (
-          <button key={item.id} onClick={() => onSelect(item.id as LensId)} className={`flex items-center gap-3 px-3 py-2 transition-all border ${activeLens === item.id ? 'bg-amber-600 border-amber-600 text-black' : 'bg-transparent border-stone-800 text-stone-500 hover:border-amber-900/50 hover:text-amber-500'}`}>
-            {item.icon}<span className="mono-font text-[10px] uppercase tracking-widest font-black">{item.label}</span>
+    <nav className="flex flex-col gap-1 mt-12 relative">
+      <span className="mono-font text-[9px] uppercase tracking-[0.4em] text-stone-600 mb-4 px-2 font-black">SELECT_EDITION</span>
+      <LayoutGroup id="sidebarTabs">
+        {options.map(item => (
+          <button 
+            key={item.id} 
+            onClick={() => onSelect(item.id as LensId)} 
+            className={`relative group flex items-center justify-between px-3 py-3 transition-colors duration-300 ${
+              activeLens === item.id 
+                ? 'text-white' 
+                : 'text-stone-500 hover:text-stone-300'
+            }`}
+          >
+            {activeLens === item.id && (
+              <motion.div 
+                layoutId="activeTab"
+                className="absolute inset-0 bg-stone-900 border-l-2 border-white -z-10"
+                transition={{ type: 'spring', bounce: 0, duration: 0.5 }}
+              />
+            )}
+            <div className="flex items-center gap-4 relative z-10">
+              {item.icon}
+              <span className="mono-font text-[10px] uppercase tracking-[0.3em] font-bold">{item.label}</span>
+            </div>
+            <ArrowRight size={10} className={`relative z-10 opacity-0 group-hover:opacity-100 transition-opacity ${activeLens === item.id ? 'opacity-100' : ''}`} />
           </button>
         ))}
-      </div>
-      <div className="h-px w-full border-t border-dashed border-stone-800" />
-      <div className="flex flex-col gap-1">
-        <span className="mono-font text-[9px] uppercase tracking-[0.4em] text-stone-500 mb-2 px-2">VIEWER_CONTEXT</span>
-        {personas.map(item => (
-          <button key={item.id} onClick={() => onSelect(item.id as LensId)} className={`flex items-center gap-3 px-3 py-2 transition-all border ${activeLens === item.id ? 'bg-stone-100 border-stone-100 text-stone-900 shadow-lg' : 'bg-transparent border-stone-800 text-stone-500 hover:border-stone-600 hover:text-stone-300'}`}>
-            {item.icon}<span className="mono-font text-[10px] uppercase tracking-widest font-bold">{item.label}</span>
-          </button>
-        ))}
-      </div>
-    </div>
+      </LayoutGroup>
+    </nav>
   );
 };
 
@@ -319,9 +377,6 @@ export default function App() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [showInputModal, setShowInputModal] = useState(false);
   const [rawText, setRawText] = useState('');
-  const [expandedArtifact, setExpandedArtifact] = useState(false);
-
-  const currentAccent = activeLens !== 'home' ? LENS_COLORS[activeLens as LensId] : ACCENT_COLOR_FALLBACK;
 
   const timelineData = useMemo(() => {
     if (activeLens === 'home') return [];
@@ -352,197 +407,225 @@ export default function App() {
   };
 
   return (
-    <LayoutGroup>
-      <div className="min-h-screen bg-[#050505] text-stone-200 sans-font flex flex-col overflow-x-hidden">
-        <style>{` ::selection { background-color: ${currentAccent}; color: white; } `}</style>
+    <div className="min-h-screen bg-[#0a0a0a] flex flex-col lg:flex-row overflow-x-hidden selection:bg-stone-900 selection:text-white">
+      
+      <AnimatePresence>
+        {targetLens && <CuratingOverlay lens={targetLens} onComplete={() => { setActiveLens(targetLens); setTargetLens(null); }} />}
+      </AnimatePresence>
 
-        <AnimatePresence>{targetLens && <ThinkingOverlay lens={targetLens} onComplete={() => { setActiveLens(targetLens); setTargetLens(null); }} />}</AnimatePresence>
+      {/* SIDEBAR: THE SYSTEM */}
+      <aside className="w-full lg:w-[320px] lg:fixed lg:h-screen lg:top-0 lg:left-0 bg-[#0a0a0a] border-r border-stone-900 z-50 p-8 flex flex-col justify-between">
+        <div>
+          <motion.div 
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            className="flex flex-col gap-1 cursor-pointer" 
+            onClick={() => setActiveLens('home')}
+          >
+            <h1 className="serif-font text-2xl text-white tracking-tight leading-none italic mb-2">Space & Color</h1>
+            <span className="mono-font text-[8px] uppercase tracking-[0.4em] text-stone-600 font-black">VOL. 01 // CONTEXT ENGINE</span>
+          </motion.div>
 
-        <header className="fixed top-0 left-0 right-0 z-[60] px-12 py-8 flex justify-between items-center mix-blend-difference">
-          <div className="flex items-center gap-6 cursor-pointer" onClick={() => handleLensSelect('home')}>
-            <div className="w-10 h-10 bg-white flex items-center justify-center"><span className="text-black text-[10px] tracking-widest font-black mono-font">INDEX</span></div>
-            <div className="hidden md:block">
-              <h1 className="serif-font text-xl text-white tracking-tight leading-none mb-1">Ashley Golen Johnston</h1>
-              <span className="mono-font text-[8px] uppercase tracking-[0.4em] text-stone-500">Context Engine v4.9.5</span>
-            </div>
+          <ViewerContext activeLens={activeLens} onSelect={handleLensSelect} />
+
+          <div className="mt-16 pt-8 border-t border-stone-900">
+            <span className="mono-font text-[9px] uppercase tracking-[0.4em] text-stone-600 mb-6 block font-black">ADAPTIVE_TUNING</span>
+            <GenerationParams activeLens={activeLens} />
           </div>
-          <div className="flex items-center gap-10">
-            <button onClick={() => setShowInputModal(true)} className="mono-font text-[10px] uppercase tracking-widest text-white border-b border-white pb-1">SOURCE_DATA</button>
-            <div className="flex items-center gap-3">
-              <div className="w-1.5 h-1.5 rounded-full status-dot" style={{ backgroundColor: currentAccent }} />
-              <span className="mono-font text-[9px] uppercase tracking-[0.2em] text-stone-400">Sync_Active</span>
-            </div>
+        </div>
+
+        <div className="pt-8 border-t border-stone-900 flex flex-col gap-6">
+          <button onClick={() => setShowInputModal(true)} className="flex items-center gap-3 mono-font text-[10px] text-stone-500 hover:text-white transition-colors uppercase tracking-[0.3em] font-black group">
+            <Command size={12} className="group-hover:rotate-90 transition-transform" /> ASSIGNMENT_DESK
+          </button>
+          <div className="flex items-center gap-3">
+            <div className="w-1.5 h-1.5 rounded-full bg-stone-600 status-dot" />
+            <span className="mono-font text-[9px] uppercase tracking-[0.2em] text-stone-700">LIVE_CIRCULATION</span>
           </div>
-        </header>
+        </div>
+      </aside>
 
-        <main className="relative pt-32 w-full flex-grow flex flex-col lg:flex-row min-h-screen">
-          <aside className="w-full lg:w-[28%] xl:w-[25%] lg:sticky lg:top-32 h-fit lg:h-[calc(100vh-128px)] px-12 pb-12 flex flex-col gap-10 z-40">
-            <AnimatePresence mode="wait">
-              {activeLens !== 'home' ? (
-                <motion.div key="active-sidebar" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-10">
-                  <div className="p-5 bg-stone-900/40 border border-stone-800">
-                    <span className="block mono-font text-[8px] text-stone-600 uppercase mb-1">Position</span>
-                    <span className="block serif-font text-sm text-stone-200 leading-tight">{project.meta.role}</span>
-                    <div className="h-px w-full bg-stone-800 my-4" />
-                    <span className="block mono-font text-[8px] text-stone-600 uppercase mb-1">Period</span>
-                    <span className="block serif-font text-sm text-stone-200">{project.meta.timeline}</span>
-                  </div>
-                  <ViewerContext activeLens={activeLens} onSelect={handleLensSelect} />
-                  <GenerationParams activeLens={activeLens} />
-                </motion.div>
-              ) : (
-                <motion.div key="home-sidebar" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="pt-20">
-                  <div className="h-px w-12 bg-stone-800 mb-8" />
-                  <p className="mono-font text-[9px] uppercase tracking-[0.5em] text-stone-600 leading-loose">SYSTEM_IDLE<br/>AWAITING_INPUT<br/>ENGINE_READY</p>
-                  <div className="mt-12"><GenerationParams activeLens="home" /></div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </aside>
+      {/* MAIN CONTENT: THE OUTPUT */}
+      <main className="flex-1 lg:ml-[320px] bg-white min-h-screen relative overflow-hidden shadow-2xl flex flex-col items-center">
+        <AnimatePresence mode="wait">
+          {activeLens === 'home' ? (
+            <motion.div 
+              key="home" 
+              initial={{ opacity: 0, scale: 1.05 }} 
+              animate={{ opacity: 1, scale: 1 }} 
+              exit={{ opacity: 0, scale: 0.95 }} 
+              transition={dossierTransition}
+              className="w-full flex-1 flex flex-col items-center justify-center p-12 text-center max-w-4xl"
+            >
+              <motion.span 
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2 }}
+                className="mono-font text-[10px] uppercase tracking-[0.6em] text-stone-400 mb-8 block font-black"
+              >
+                INITIALIZING_COVER_STORY
+              </motion.span>
+              <motion.h2 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.4 }}
+                className="serif-font text-[10vw] leading-[0.8] text-stone-900 italic tracking-tighter mb-12"
+              >
+                TheIssue.
+              </motion.h2>
+              <motion.p 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.6 }}
+                className="sans-font text-xl text-stone-500 leading-loose max-w-2xl mb-16"
+              >
+                A live-curated editorial experience. Intelligent storytelling, tailored to your reader profile.
+              </motion.p>
+              <motion.button 
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.8 }}
+                onClick={() => handleLensSelect('recruiter')} 
+                className="border border-stone-900 px-10 py-4 mono-font text-[10px] font-black uppercase tracking-[0.5em] hover:bg-stone-900 hover:text-white transition-all"
+              >
+                READ_COVER_STORY
+              </motion.button>
+            </motion.div>
+          ) : (
+            <motion.article 
+              key={activeLens} 
+              initial={{ opacity: 0, y: 60, scale: 0.98 }} 
+              animate={{ opacity: 1, y: 0, scale: 1 }} 
+              exit={{ opacity: 0, y: -20, scale: 1 }} 
+              transition={dossierTransition}
+              className="w-full max-w-[1400px] flex flex-col origin-top"
+            >
+              {/* HERO IMAGE */}
+              <div className="px-8 md:px-20 pt-12">
+                <CaseStudyImage src="hero.jpg" alt="Google Cloud Next '24 Keynote Stage" />
+              </div>
 
-          <section className="flex-1 relative z-10 min-h-screen">
-            <AnimatePresence mode="wait">
-              {activeLens === 'home' ? (
-                <motion.div key="home-view" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex flex-col items-center justify-center pt-40 lg:pt-60 text-center px-12 h-full">
-                  <h2 className="serif-font text-[10vw] text-white leading-none tracking-tighter italic mb-12">Glass<br/>Box.</h2>
-                  <div className="max-w-xl mono-font text-xs uppercase tracking-[0.4em] text-stone-500 leading-relaxed mb-16">Architecting trust through verifiable system evidence. A multi-lens dossier experience.</div>
-                  <button onClick={() => handleLensSelect('recruiter')} className="bg-white text-black px-12 py-4 mono-font text-xs font-black uppercase tracking-[0.4em] hover:bg-stone-200 transition-colors">Launch_Engine</button>
+              {/* HERO SECTION */}
+              <motion.header 
+                variants={staggerContainer}
+                initial="hidden"
+                animate="show"
+                className="px-8 md:px-20 py-10 md:py-20 flex flex-col gap-12 border-b border-stone-100"
+              >
+                <motion.div variants={fadeUpItem} className="flex items-center gap-4 text-stone-400 mono-font text-[10px] uppercase tracking-[0.5em] font-black">
+                  <FileText size={14} /> EDITION::{activeLens.toUpperCase()}
                 </motion.div>
-              ) : (
-                <motion.div key={activeLens} initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -30 }} transition={{ duration: 0.8 }} className="bg-white min-h-screen shadow-[-20px_0_40px_rgba(0,0,0,0.5)] flex flex-col">
-                  
-                  {/* HERO IMAGE - Resolved via CDN */}
-                  <div className="w-full aspect-[21/9] overflow-hidden relative group border-b border-stone-100 bg-stone-100">
-                    <CaseStudyImage 
-                      src="hero.jpg" 
-                      alt="Project Hero" 
-                      className="w-full h-full object-cover grayscale-[0.8] group-hover:grayscale-0 transition-all duration-[1200ms] ease-out scale-105 group-hover:scale-100" 
-                    />
-                    <div className="absolute inset-0 bg-stone-900/5 pointer-events-none group-hover:bg-transparent transition-all duration-700" />
-                    <div className="absolute top-8 left-8 bg-white/90 backdrop-blur px-3 py-1 mono-font text-[9px] text-stone-800 tracking-widest font-black border border-stone-200">PROJECT_ROOT // {project.meta.title.toUpperCase().replace(/\s+/g, '_')}</div>
-                  </div>
-
-                  <div className="max-w-5xl mx-auto text-[#1a1a1a] p-8 md:p-24 pt-12 md:pt-16 w-full">
-                    <header className="grid grid-cols-1 lg:grid-cols-12 gap-12 mb-40">
-                      <div className="lg:col-span-12 flex justify-between items-center mb-8">
-                        <div className="flex items-center gap-4">
-                          <Crosshair size={16} style={{ color: currentAccent }} />
-                          <span className="mono-font text-[10px] uppercase tracking-[0.5em] text-stone-400 font-bold">[ Perspective::{activeLens.toUpperCase()} ]</span>
-                        </div>
+                <motion.h2 variants={fadeUpItem} className="serif-font text-6xl md:text-9xl leading-[0.9] text-stone-950 font-light tracking-tightest">
+                  {project.lenses[activeLens as LensId].headline}
+                </motion.h2>
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-12 mt-12">
+                  <motion.div variants={fadeUpItem} className="max-w-xl">
+                    <span className="mono-font text-[10px] text-stone-400 uppercase tracking-[0.4em] mb-4 block font-black">EDITOR'S_NOTE</span>
+                    <p className="serif-font italic text-3xl text-stone-800 leading-snug">
+                      "{project.lenses[activeLens as LensId].reasoning}"
+                    </p>
+                  </motion.div>
+                  <motion.div variants={fadeUpItem} className="bg-stone-50 p-6 border border-stone-100 min-w-[280px]">
+                    <span className="mono-font text-[9px] text-stone-400 uppercase tracking-[0.4em] mb-4 block font-black">Issue_Meta</span>
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-[11px] mono-font uppercase tracking-widest font-bold">
+                        <span className="text-stone-400">Status</span>
+                        <span className="text-stone-900">{project.lenses[activeLens as LensId].status}</span>
                       </div>
-                      <div className="lg:col-span-8"><h2 className="serif-font text-[6vw] leading-[0.95] text-[#1a1a1a] font-light tracking-tightest mb-0">{project.lenses[activeLens as LensId].headline}</h2></div>
-                      <div className="lg:col-span-4 lg:mt-24">
-                        <div className="p-8 bg-stone-50 border border-stone-100 relative">
-                          <span className="mono-font text-[9px] uppercase tracking-[0.4em] text-stone-400 mb-6 block font-black">Perspective_Meta</span>
-                          <p className="mono-font text-[11px] uppercase tracking-widest font-bold mb-4" style={{ color: currentAccent }}>{project.lenses[activeLens as LensId].status}</p>
-                          <div className="flex justify-end pt-4 border-t border-stone-100"><Fingerprint className="w-6 h-6 opacity-10 text-stone-900" /></div>
-                        </div>
+                      <div className="flex justify-between text-[11px] mono-font uppercase tracking-widest font-bold">
+                        <span className="text-stone-400">Context</span>
+                        <span className="text-stone-900">Live_Circulation</span>
                       </div>
-                    </header>
+                    </div>
+                  </motion.div>
+                </div>
+              </motion.header>
 
-                    <div className="relative py-32 mb-40 border-y border-stone-100">
-                      <blockquote className="serif-font italic text-[4vw] text-[#1A1A1A] leading-[1.1] text-center max-w-4xl mx-auto">"{project.lenses[activeLens as LensId].reasoning}"</blockquote>
+              {/* MAIN CONTENT AREA: POLISHED MARGINALIA LAYOUT */}
+              <div className="px-8 md:px-20 py-20 flex flex-col gap-32">
+                {timelineData.map((section, idx) => (
+                  <motion.div 
+                    key={idx} 
+                    initial={{ opacity: 0, y: 30 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true, margin: "-100px" }}
+                    transition={{ duration: 0.8, delay: idx * 0.1, ease: [0.25, 1, 0.5, 1] }}
+                    className="grid grid-cols-1 lg:grid-cols-12 gap-8 md:gap-16 lg:gap-24 items-start"
+                  >
+                    {/* LEFT MARGIN: STICKY SECTION HEADER */}
+                    <div className="lg:col-span-3 lg:sticky lg:top-24 mb-6 lg:mb-0">
+                      <div className="flex flex-col gap-4">
+                        <span className="mono-font text-[10px] text-stone-300 font-black tracking-[0.5em] uppercase">SECTION_{String(idx + 1).padStart(2, '0')}</span>
+                        <h4 className="serif-font text-2xl md:text-4xl text-stone-950 font-normal leading-tight">{section.title}</h4>
+                        <div className="h-[2px] w-12 bg-stone-900 mt-4" />
+                      </div>
                     </div>
 
-                    <div className="space-y-40">
-                      {timelineData.map((item, i) => (
-                        <div key={i} className="flex gap-10">
-                          <div className="sticky top-40 self-start h-12 w-12 bg-white flex items-center justify-center border border-stone-100"><div className="h-2 w-2 rounded-full" style={{ backgroundColor: currentAccent }} /></div>
-                          <div className="flex-1">
-                            <h3 className="text-3xl md:text-5xl font-light text-[#1A1A1A] serif-font italic mb-10">{item.title}</h3>
-                            <StreamingMarkdown content={item.body} lens={activeLens as LensId} />
-                          </div>
-                        </div>
-                      ))}
+                    {/* RIGHT COLUMN: MARGINALIA CONTENT WITH CLEAR GUTTER */}
+                    <div className="lg:col-span-8 lg:col-start-5 pt-1 lg:pt-0">
+                      <StreamingMarkdown content={section.body} lens={activeLens as LensId} />
                     </div>
-
-                    {project.lenses[activeLens as LensId].artifact && (
-                      <div className="mt-64 relative border-t-2 border-stone-900 pt-24">
-                        <div className="absolute -top-3 left-0 bg-stone-900 text-white px-3 py-1 mono-font text-[10px] tracking-widest font-bold">ARTIFACT_NODE</div>
-                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
-                          <div className="lg:col-span-4 flex flex-col justify-center">
-                            <span className="mono-font text-[10px] text-stone-400 uppercase tracking-[0.4em] mb-4">Recommended Visualization</span>
-                            <p className="serif-font text-2xl text-[#1a1a1a] font-medium leading-snug mb-8">{project.lenses[activeLens as LensId].artifact}</p>
-                            <button onClick={() => setExpandedArtifact(true)} className="flex items-center gap-4 mono-font text-[10px] uppercase font-bold tracking-widest text-stone-400 hover:text-black transition-colors">
-                              <div className="w-10 h-px bg-stone-200" /> Expand_Data
-                            </button>
-                          </div>
-                          <div className="lg:col-span-8">
-                            <motion.div layoutId="artifact-card" onClick={() => setExpandedArtifact(true)} className="aspect-video bg-stone-50 border border-stone-100 flex items-center justify-center relative overflow-hidden group cursor-pointer">
-                              <div className="absolute inset-0 opacity-10 blur-3xl rounded-full scale-150 transition-transform group-hover:scale-110 duration-700" style={{ backgroundColor: currentAccent }} />
-                              <Maximize2 className="relative z-10 text-stone-200 group-hover:text-stone-900 transition-colors" size={48} strokeWidth={0.5} />
-                              <div className="absolute bottom-4 left-4 mono-font text-[8px] text-stone-300 uppercase tracking-widest">Render_v_4.2.1</div>
-                            </motion.div>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </section>
-        </main>
-
-        <AnimatePresence>
-          {expandedArtifact && activeLens !== 'home' && (
-            <div className="fixed inset-0 z-[300] flex items-center justify-center p-8">
-              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setExpandedArtifact(false)} className="absolute inset-0 bg-[#050505]/95 backdrop-blur-2xl" />
-              <motion.div layoutId="artifact-card" className="relative w-full max-w-6xl bg-[#050505] border border-stone-800 p-12 shadow-2xl overflow-hidden flex flex-col gap-12">
-                <div className="absolute top-0 left-0 w-full h-1" style={{ backgroundColor: currentAccent }} />
-                <div className="flex justify-between items-start">
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-3"><Layers size={14} style={{ color: currentAccent }} /><span className="mono-font text-[10px] text-stone-500 uppercase tracking-[0.4em]">Schematic_View / {activeLens.toUpperCase()}</span></div>
-                    <h3 className="serif-font text-4xl text-white italic">{project.lenses[activeLens as LensId].artifact}</h3>
-                  </div>
-                  <button onClick={() => setExpandedArtifact(false)} className="text-stone-600 hover:text-white transition-all"><X size={32} /></button>
-                </div>
-                <div className="flex-1 aspect-video bg-stone-900 border border-stone-800 relative group overflow-hidden flex items-center justify-center">
-                  <div className="absolute inset-0 opacity-10 bg-[url('https://placehold.co/1200x800/1a1a1a/FFF?text=SYSTEM_BLUEPRINT_V4')] bg-cover bg-center grayscale mix-blend-overlay" />
-                  <div className="flex flex-col items-center gap-6 relative z-10">
-                    <div className="w-24 h-24 rounded-full border border-stone-800 flex items-center justify-center animate-spin-slow"><Crosshair className="text-stone-700" size={40} strokeWidth={0.5} /></div>
-                    <p className="mono-font text-[10px] text-stone-600 uppercase tracking-[0.5em] animate-pulse">Scanning_Active_Telemetry_Node...</p>
-                  </div>
-                </div>
-                <div className="flex justify-between items-center text-[10px] mono-font text-stone-700 uppercase tracking-widest">
-                  <span className="flex items-center gap-4"><Scan size={14} /> Ref_0x91F_DATA_STREAM</span>
-                  <span className="flex items-center gap-4"><Database size={14} /> Provenance_Verified</span>
-                </div>
-              </motion.div>
-            </div>
+                  </motion.div>
+                ))}
+              </div>
+            </motion.article>
           )}
         </AnimatePresence>
+      </main>
 
-        <AnimatePresence>
-          {showInputModal && (
-            <div className="fixed inset-0 z-[200] flex items-center justify-center p-8">
-              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => !isGenerating && setShowInputModal(false)} className="absolute inset-0 bg-stone-950/90 backdrop-blur-xl" />
-              <motion.div initial={{ scale: 0.98, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.98, opacity: 0 }} className="relative w-full max-w-5xl bg-stone-900 p-12 shadow-2xl border border-stone-800">
-                <div className="flex justify-between items-center mb-12">
-                  <div className="flex items-center gap-6"><Sparkles className="w-8 h-8" style={{ color: currentAccent }} /><h2 className="serif-font text-4xl italic text-white">Ingestion_Pipeline</h2></div>
-                  <button onClick={() => setShowInputModal(false)} className="text-stone-600 hover:text-white transition-all"><X size={32} /></button>
+      {/* INPUT MODAL: ASSIGNMENT_DESK */}
+      {/* Fix: Ensured name is AnimatePresence to resolve "Cannot find name 'AnPresence'" error on line 414 */}
+      <AnimatePresence>
+        {showInputModal && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-8">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => !isGenerating && setShowInputModal(false)} className="absolute inset-0 bg-[#0a0a0a]/95 backdrop-blur-md" />
+            <motion.div 
+              initial={{ scale: 0.95, opacity: 0, y: 20 }} 
+              animate={{ scale: 1, opacity: 1, y: 0 }} 
+              exit={{ scale: 0.95, opacity: 0, y: 20 }} 
+              transition={dossierTransition}
+              className="relative w-full max-w-4xl bg-white p-12 shadow-2xl border border-stone-100"
+            >
+              <div className="flex justify-between items-center mb-12">
+                <div className="flex items-center gap-6">
+                  <Sparkles className="w-8 h-8 text-stone-900" />
+                  <h2 className="serif-font text-5xl italic text-stone-950">Assignment_Desk</h2>
                 </div>
-                <textarea value={rawText} onChange={(e) => setRawText(e.target.value)} placeholder="Provide raw case study metadata..." className="w-full h-80 p-8 bg-stone-950 border border-stone-800 text-stone-200 outline-none resize-none serif-font text-2xl font-light mb-12" />
-                <div className="flex justify-between items-center">
-                  <p className="mono-font text-[10px] text-stone-600 uppercase tracking-widest max-w-md leading-relaxed">System will architect three contextual lenses using probabilistic semantic reconstruction.</p>
-                  <button disabled={isGenerating || !rawText.trim()} onClick={handleGenerate} className={`px-12 py-4 mono-font text-xs font-black uppercase tracking-[0.4em] transition-all ${isGenerating || !rawText.trim() ? 'bg-stone-800 text-stone-700 cursor-not-allowed' : 'bg-white text-black hover:bg-stone-200'}`}>
-                    {isGenerating ? <Loader2 className="animate-spin" /> : 'Execute_Build'}
-                  </button>
-                </div>
-              </motion.div>
-            </div>
-          )}
-        </AnimatePresence>
-
-        <footer className="px-12 py-20 flex flex-col md:flex-row justify-between items-center gap-12 text-[10px] mono-font text-stone-800 uppercase tracking-[0.6em] font-black border-t border-white/5 relative z-50 bg-[#050505]">
-          <p>© ASJH CONTEXT ENGINE // SPACE & COLOR 2024</p>
-          <div className="flex gap-20 text-stone-400">
-            <span className="hover:text-stone-200 cursor-pointer transition-colors border-b border-transparent hover:border-stone-700 pb-1">Architectural_Manifesto</span>
+                <button onClick={() => setShowInputModal(false)} className="text-stone-300 hover:text-stone-950 transition-all"><X size={32} /></button>
+              </div>
+              <textarea 
+                value={rawText} 
+                onChange={(e) => setRawText(e.target.value)} 
+                placeholder="Submit raw case study manuscript for curation..." 
+                className="w-full h-80 p-10 bg-stone-50 border border-stone-100 text-stone-900 outline-none resize-none serif-font text-3xl font-light mb-12 placeholder:text-stone-200 focus:bg-white transition-colors" 
+              />
+              <div className="flex justify-between items-center">
+                <p className="mono-font text-[10px] text-stone-400 uppercase tracking-[0.3em] max-w-sm leading-relaxed">The system will analyze and typeset three custom editions based on semantic reconstruction.</p>
+                <button 
+                  disabled={isGenerating || !rawText.trim()} 
+                  onClick={handleGenerate} 
+                  className={`px-12 py-5 mono-font text-xs font-black uppercase tracking-[0.4em] transition-all ${
+                    isGenerating || !rawText.trim() ? 'bg-stone-100 text-stone-300 cursor-not-allowed' : 'bg-stone-950 text-white hover:bg-stone-800'
+                  }`}
+                >
+                  {isGenerating ? <Loader2 className="animate-spin" /> : 'Typeset_Issue'}
+                </button>
+              </div>
+            </motion.div>
           </div>
-        </footer>
+        )}
+      </AnimatePresence>
 
-        <style>{` @keyframes spin-slow { from { transform: rotate(0deg); } to { transform: rotate(360deg); } } .animate-spin-slow { animation: spin-slow 12s linear infinite; } `}</style>
-      </div>
-    </LayoutGroup>
+      <footer className="fixed bottom-8 left-[360px] hidden lg:block z-[40] pointer-events-none">
+        <motion.span 
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 1 }}
+          className="mono-font text-[9px] uppercase tracking-[0.8em] text-stone-300 font-black"
+        >
+          PUBLISHED BY SPACE & COLOR PRESS // 2024
+        </motion.span>
+      </footer>
+    </div>
   );
 }
